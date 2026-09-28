@@ -29,12 +29,12 @@ A starter kit for multi-tenant SaaS apps on Laravel. It's the official Laravel R
 1. Create the project with the Laravel installer:
 
    ```bash
-   laravel new myapp --using=https://github.com/bzelaznicki/laravel-tenancy-starter --database=pgsql
+   laravel new myapp --using=bzelaznicki/laravel-tenancy-starter --database=pgsql
    ```
 
-   Pass the full GitHub URL. The short `--using=bzelaznicki/laravel-tenancy-starter` form needs the package on Packagist, and it isn't published there. Keep `--database=pgsql`. The starter is built and tested on PostgreSQL, and without the flag the installer switches `.env` to SQLite.
+   Keep `--database=pgsql`. The starter is built and tested on PostgreSQL, and without the flag the installer switches `.env` to SQLite.
 
-   You can also click **Use this template** on GitHub, or clone the repository.
+   You can also run `composer create-project bzelaznicki/laravel-tenancy-starter myapp --stability=dev`, click **Use this template** on GitHub, or clone the repository.
 2. Rename the app:
    - `APP_NAME`, `APP_URL`, `APP_DOMAIN` and `DB_DATABASE` in `.env.example` (and `.env` if the installer created one)
    - the defaults in `config/app.php`
