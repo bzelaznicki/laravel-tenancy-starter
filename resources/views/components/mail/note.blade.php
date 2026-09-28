@@ -1,0 +1,1 @@
+<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background:#f7f5f1;border:1px solid #e7e4de;border-radius:6px"><tbody><tr><td style="padding:14px 16px;font-size:12.5px;line-height:1.6;color:#5f5c57">{{ $slot }}</td></tr></tbody></table>

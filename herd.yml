@@ -1,0 +1,7 @@
+name: tenancy-starter
+php: '8.5'
+secured: true
+aliases: {  }
+services: {  }
+integrations:
+    forge: {  }
