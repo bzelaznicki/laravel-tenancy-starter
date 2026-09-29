@@ -32,7 +32,7 @@ A starter kit for multi-tenant SaaS apps on Laravel. It's the official Laravel R
    laravel new myapp --using=bzelaznicki/laravel-tenancy-starter
    ```
 
-   Choose your database when prompted, or pass `--database=pgsql`, `--database=mysql`, `--database=mariadb` or `--database=sqlite`. SQLite is the default in `.env.example` and needs no database server.
+   Pass `--database=pgsql`, `--database=mysql`, `--database=mariadb` or `--database=sqlite` to select your database. Without the flag, the installer uses SQLite, which is also the default in `.env.example` and needs no database server.
 
    You can also run `composer create-project bzelaznicki/laravel-tenancy-starter myapp --stability=dev`, click **Use this template** on GitHub, or clone the repository.
 2. Rename the app:
