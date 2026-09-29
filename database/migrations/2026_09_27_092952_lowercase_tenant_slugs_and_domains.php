@@ -25,8 +25,8 @@ return new class extends Migration
             }
         }
 
-        DB::statement('UPDATE tenants SET slug = LOWER(slug) WHERE slug <> LOWER(slug)');
-        DB::statement('UPDATE domains SET domain = LOWER(domain) WHERE domain <> LOWER(domain)');
+        DB::statement('UPDATE tenants SET slug = LOWER(slug)');
+        DB::statement('UPDATE domains SET domain = LOWER(domain)');
     }
 
     /**

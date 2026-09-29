@@ -5,7 +5,8 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\TenantRole;
 use Carbon\CarbonInterface;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Laravel\assertModelExists;
 
@@ -62,7 +63,7 @@ it('hides the token hash when serialized', function (): void {
     $invitation = Invitation::factory()->create();
 
     expect($invitation->token_hash)->not->toBeNull()
-        ->and($invitation->toArray())->not->toHaveKey('token_hash');
+        ->and($invitation->toArray())->not->toHaveKeys(['token_hash', 'open_slot']);
 });
 
 it('creates an invitation with a personal message', function (): void {
@@ -98,7 +99,10 @@ it('prevents multiple open invitations for the same tenant and email', function 
     expect(fn () => Invitation::factory()
         ->for($tenant)
         ->create(['email' => $email]))
-        ->toThrow(QueryException::class);
+        ->toThrow(function (UniqueConstraintViolationException $exception): void {
+            expect($exception->index === 'invitations_one_open_per_tenant_email'
+                || $exception->columns === ['tenant_id', 'email'])->toBeTrue();
+        });
 });
 
 it('allows a replacement after an invitation is accepted revoked or expired', function (string $state): void {
@@ -137,3 +141,51 @@ it('allows the same email to have open invitations in different tenants', functi
             ->count()
     )->toBe(2);
 });
+
+it('allows multiple closed invitations for the same tenant and email', function (string $state): void {
+    $this->freezeTime();
+    $inviter = User::factory()->create();
+    $tenant = Tenant::factory()->withMember($inviter)->create();
+    $email = 'dinesh@piedpiper.com';
+    Invitation::factory()->forTenant($tenant, $inviter)->{$state}()->count(2)->create(['email' => $email]);
+
+    $replacement = Invitation::factory()->forTenant($tenant, $inviter)->create(['email' => $email]);
+
+    assertModelExists($replacement);
+    $this->assertDatabaseCount('invitations', 3);
+})->with(['accepted', 'revoked', 'expired']);
+
+it('frees the invitation slot when an existing invitation is closed', function (string $column): void {
+    $this->freezeTime();
+    $inviter = User::factory()->create();
+    $tenant = Tenant::factory()->withMember($inviter)->create();
+    $email = 'dinesh@piedpiper.com';
+    $invitation = Invitation::factory()->forTenant($tenant, $inviter)->create(['email' => $email]);
+
+    $invitation->update([$column => now()]);
+    $replacement = Invitation::factory()->forTenant($tenant, $inviter)->create(['email' => $email]);
+
+    assertModelExists($replacement);
+    $this->assertDatabaseCount('invitations', 2);
+})->with(['accepted_at', 'revoked_at', 'expired_at']);
+
+it('preserves invitation history and open invitation uniqueness when rebuilding SQLite foreign keys', function (): void {
+    $this->freezeTime();
+    $inviter = User::factory()->create();
+    $tenant = Tenant::factory()->withMember($inviter)->create();
+    $email = 'dinesh@piedpiper.com';
+    Invitation::factory()->forTenant($tenant, $inviter)->accepted()->count(2)->create(['email' => $email]);
+    $pending = Invitation::factory()->forTenant($tenant, $inviter)->create(['email' => $email]);
+    $migration = require database_path('migrations/2026_09_24_171946_make_invited_by_nullable_on_invitations_table.php');
+
+    $migration->down();
+    $migration->up();
+    $pending->update(['revoked_at' => now()]);
+    $replacement = Invitation::factory()->forTenant($tenant, $inviter)->create(['email' => $email]);
+
+    assertModelExists($replacement);
+    $this->assertDatabaseCount('invitations', 4);
+
+    expect(fn () => Invitation::factory()->forTenant($tenant, $inviter)->create(['email' => $email]))
+        ->toThrow(UniqueConstraintViolationException::class);
+})->skip(fn (): bool => DB::connection()->getDriverName() !== 'sqlite', 'Only SQLite rebuilds the table to change foreign keys.');

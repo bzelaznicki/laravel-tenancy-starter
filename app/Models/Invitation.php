@@ -48,7 +48,7 @@ use Illuminate\Support\Str;
     'expired_at',
     'last_sent_at',
 ])]
-#[Hidden(['token_hash'])]
+#[Hidden(['token_hash', 'open_slot'])]
 class Invitation extends Model
 {
     /** @use HasFactory<InvitationFactory> */

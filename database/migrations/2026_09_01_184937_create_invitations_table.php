@@ -27,7 +27,19 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'email']);
+
+            if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                $table->unsignedTinyInteger('open_slot')->nullable()->virtualAs(
+                    'CASE WHEN accepted_at IS NULL AND revoked_at IS NULL AND expired_at IS NULL THEN 1 ELSE NULL END'
+                );
+                $table->unique(['tenant_id', 'email', 'open_slot'], 'invitations_one_open_per_tenant_email');
+            }
         });
+
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            return;
+        }
+
         DB::statement(
             'CREATE UNIQUE INDEX invitations_one_open_per_tenant_email ON invitations (tenant_id, email)
 WHERE accepted_at IS NULL
@@ -41,8 +53,6 @@ AND expired_at IS NULL'
      */
     public function down(): void
     {
-        DB::statement('DROP INDEX IF EXISTS invitations_one_open_per_tenant_email');
-
         Schema::dropIfExists('invitations');
     }
 };
