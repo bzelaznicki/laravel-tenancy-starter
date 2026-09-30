@@ -76,7 +76,7 @@ CI runs the PHP and browser suites, plus migration rollback and reapply checks, 
 
 For PostgreSQL, MySQL or MariaDB, create an empty database and set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` in `.env`. For SQLite, leave `DB_DATABASE` unset to use `database/database.sqlite`, which setup creates, or set it to an absolute file path. Use a separate file for SQLite tests that open multiple connections; `:memory:` databases are private to each connection.
 
-MySQL and MariaDB default to `utf8mb4_bin` so exact string comparisons and accented email addresses behave consistently with PostgreSQL and SQLite. A separate database index enforces case-insensitive user email uniqueness. PostgreSQL and SQLite use a partial unique index for open invitations; MySQL and MariaDB use a generated column with a unique index. These constraints apply to raw inserts as well as Eloquent writes.
+MySQL and MariaDB default to `utf8mb4_bin`, which provides case-sensitive comparisons and uses PAD SPACE semantics: trailing spaces are ignored in equality comparisons. A separate database index enforces case-insensitive user email uniqueness. PostgreSQL and SQLite use a partial unique index for open invitations; MySQL and MariaDB use a generated column with a unique index. These constraints apply to raw inserts as well as Eloquent writes.
 
 SQLite starts transactions in `IMMEDIATE` mode and waits up to five seconds for a busy database. This serializes writes so concurrent invitation acceptance and resend requests recheck the latest state before making changes.
 

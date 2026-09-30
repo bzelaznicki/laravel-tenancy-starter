@@ -12,6 +12,19 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $collisions = DB::table('users')
+            ->selectRaw('LOWER(email) AS value')
+            ->groupByRaw('LOWER(email)')
+            ->havingRaw('COUNT(*) > 1')
+            ->orderBy('value')
+            ->pluck('value');
+
+        if ($collisions->isNotEmpty()) {
+            throw new RuntimeException(
+                "Cannot lowercase users.email; these values collide: {$collisions->implode(', ')}",
+            );
+        }
+
         DB::statement('UPDATE users SET email = LOWER(email)');
 
         if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
