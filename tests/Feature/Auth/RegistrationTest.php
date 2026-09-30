@@ -397,7 +397,7 @@ function runConcurrentRegistrationAttempt($socket, array $input): never
     try {
         DB::purge();
 
-        User::creating(function () use ($socket): void {
+        DB::connection()->beforeStartingTransaction(function () use ($socket): void {
             fwrite($socket, "ready\n");
 
             if (trim((string) fgets($socket)) !== 'go') {

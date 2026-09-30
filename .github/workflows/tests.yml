@@ -11,21 +11,40 @@ permissions:
 
 jobs:
   ci:
+    name: CI (${{ matrix.database }})
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: pgsql
+            port: 5432
+            username: postgres
+            password: postgres
+          - database: mysql
+            port: 3306
+            username: root
+            password: password
+          - database: mariadb
+            port: 3306
+            username: root
+            password: password
+          - database: sqlite
+
     env:
-      DB_CONNECTION: pgsql
+      DB_CONNECTION: ${{ matrix.database }}
       DB_HOST: 127.0.0.1
-      DB_PORT: 5432
-      DB_DATABASE: tenancy_starter_test
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
+      DB_PORT: ${{ matrix.port }}
+      DB_DATABASE: ${{ matrix.database == 'sqlite' && format('{0}/database/database.sqlite', github.workspace) || 'tenancy_starter_test' }}
+      DB_USERNAME: ${{ matrix.username }}
+      DB_PASSWORD: ${{ matrix.password }}
       APP_URL: https://tenancy-starter.localhost
       APP_DOMAIN: tenancy-starter.localhost
 
     services:
       postgres:
-        image: postgres:18
+        image: ${{ matrix.database == 'pgsql' && 'postgres:18' || '' }}
 
         env:
           POSTGRES_DB: tenancy_starter_test
@@ -41,6 +60,38 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      mysql:
+        image: ${{ matrix.database == 'mysql' && 'mysql:8.4' || '' }}
+
+        env:
+          MYSQL_DATABASE: tenancy_starter_test
+          MYSQL_ROOT_PASSWORD: password
+
+        ports:
+          - 3306:3306
+
+        options: >-
+          --health-cmd "mysqladmin ping --host=127.0.0.1 --password=password"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      mariadb:
+        image: ${{ matrix.database == 'mariadb' && 'mariadb:11.8' || '' }}
+
+        env:
+          MARIADB_DATABASE: tenancy_starter_test
+          MARIADB_ROOT_PASSWORD: password
+
+        ports:
+          - 3306:3306
+
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,6 +102,7 @@ jobs:
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: "8.5"
+          extensions: pdo_pgsql, pdo_mysql, pdo_sqlite
           tools: composer:v2
           coverage: none
 
@@ -65,6 +117,11 @@ jobs:
       - name: Install Playwright Chromium dependencies
         run: npx playwright install --with-deps chromium
 
+      - name: Verify migration rollback and reapply
+        run: |
+          php artisan migrate:reset --force --no-interaction
+          php artisan migrate --force --no-interaction
+
       - name: Run CI Checks
         run: composer ci:check
 
@@ -72,6 +129,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: browser-failure-screenshots
+          name: browser-failure-screenshots-${{ matrix.database }}
           path: tests/Browser/Screenshots
           if-no-files-found: ignore

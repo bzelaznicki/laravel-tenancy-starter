@@ -334,14 +334,28 @@ it('creates only one pending invitation and returns a validation error for the c
     try {
         $insertedCompetitor = false;
 
-        Invitation::creating(function (Invitation $invitation) use ($tenant, $winningInvitation, $competingConnection, &$insertedCompetitor): void {
-            if ($invitation->tenant_id !== $tenant->id || $insertedCompetitor) {
+        $insertCompetitor = function () use ($winningInvitation, $competingConnection, &$insertedCompetitor): void {
+            if ($insertedCompetitor) {
                 return;
             }
 
             $insertedCompetitor = true;
             $winningInvitation->setConnection($competingConnection)->saveQuietly();
-        });
+        };
+
+        /**
+         * PostgreSQL allows a competing insert after an empty SELECT FOR UPDATE.
+         * Other engines lock the range or database, so commit before taking that lock.
+         */
+        if ($connection->getDriverName() === 'pgsql') {
+            Invitation::creating(function (Invitation $invitation) use ($tenant, $insertCompetitor): void {
+                if ($invitation->tenant_id === $tenant->id) {
+                    $insertCompetitor();
+                }
+            });
+        } else {
+            $connection->beforeStartingTransaction($insertCompetitor);
+        }
 
         $this->actingAs($owner)
             ->post(tenantRoute($tenant, 'invitations.store'), [
@@ -375,22 +389,26 @@ it('creates only one pending invitation and returns a validation error for the c
     }
 });
 
-it('returns a validation error when the database reports the pending invitation constraint by columns', function (): void {
+it('returns a validation error when the database reports the pending invitation constraint', function (string $constraint): void {
     Notification::fake();
     $owner = User::factory()->create();
     $tenant = Tenant::factory()->withDomain()->withMember($owner, TenantRole::Owner)->create();
 
-    Invitation::creating(function (Invitation $invitation) use ($tenant): void {
+    Invitation::creating(function (Invitation $invitation) use ($tenant, $constraint): void {
         if ($invitation->tenant_id !== $tenant->id) {
             return;
         }
 
-        throw (new UniqueConstraintViolationException(
+        $exception = new UniqueConstraintViolationException(
             'testing',
             'insert into invitations',
             [],
             new PDOException('Unique constraint violation.'),
-        ))->setColumns(['tenant_id', 'email']);
+        );
+
+        throw $constraint === 'index'
+            ? $exception->setIndex('invitations_one_open_per_tenant_email')
+            : $exception->setColumns(['tenant_id', 'email']);
     });
 
     $this->actingAs($owner)
@@ -407,7 +425,7 @@ it('returns a validation error when the database reports the pending invitation 
     ]);
 
     Notification::assertNothingSent();
-});
+})->with(['index', 'columns']);
 
 it('ignores forged tenant and inviter IDs when creating an invitation', function (): void {
     $email = 'gilfoyle@piedpiper.com';
