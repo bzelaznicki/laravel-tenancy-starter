@@ -40,6 +40,7 @@ export default function FindTenant() {
                                         aria-invalid={Boolean(errors.subdomain)}
                                         name="subdomain"
                                         id="subdomain"
+                                        autoFocus
                                     />
                                     <InputGroupAddon align="inline-end">
                                         <InputGroupText>
